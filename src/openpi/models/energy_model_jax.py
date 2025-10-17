@@ -11,9 +11,9 @@ from openpi.shared import array_typing as at
 class PositionalEncoding(nnx.Module):
     """Positional encoding with sine and cosine functions."""
     
-    def __init__(self, num_hiddens: int, dropout: float = 0.2, max_len: int = 20000):
+    def __init__(self, num_hiddens: int, rngs: nnx.Rngs, dropout: float = 0.2, max_len: int = 20000):
         super().__init__()
-        self.dropout = nnx.Dropout(dropout)
+        self.dropout = nnx.Dropout(dropout, rngs=rngs)
         self.num_hiddens = num_hiddens
         self.max_len = max_len
     
@@ -164,7 +164,7 @@ class EnergyModel(nnx.Module):
         )
         
         # Positional encoding
-        self.pe_layer = PositionalEncoding(hidden, dropout=0.2)
+        self.pe_layer = PositionalEncoding(hidden, rngs=rngs, dropout=0.2)
         
         # MLP ResNets for state and action
         self.state_linear = MLPResNet(
