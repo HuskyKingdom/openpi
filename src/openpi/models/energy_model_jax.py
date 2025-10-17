@@ -225,10 +225,9 @@ class EnergyModel(nnx.Module):
         # Cross attention: actions attend to context
         # In JAX MultiHeadAttention: query, key, value order
         # mask: True means "do not attend", opposite of PyTorch
+        # Note: Runtime checks on traced arrays are not possible in JIT.
+        # Ensure pad_mask doesn't have all-True rows when calling this function.
         if pad_mask is not None:
-            # Check for all-True rows which would cause NaN
-            if jnp.any(jnp.all(pad_mask, axis=1)):
-                raise ValueError("[NaN-risk] some rows in pad_mask are all True")
             # Convert mask for cross attention [B, H, S]
             # Expand to match attention shape
             attn_mask = pad_mask[:, None, :]  # [B, 1, S]
