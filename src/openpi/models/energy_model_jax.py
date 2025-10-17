@@ -14,18 +14,20 @@ class PositionalEncoding(nnx.Module):
     def __init__(self, num_hiddens: int, dropout: float = 0.2, max_len: int = 20000):
         super().__init__()
         self.dropout = nnx.Dropout(dropout)
-        
-        # Create positional encoding matrix
-        position = jnp.arange(max_len, dtype=jnp.float32).reshape(-1, 1)
-        div_term = jnp.arange(0, num_hiddens, 2, dtype=jnp.float32) / num_hiddens
+        self.num_hiddens = num_hiddens
+        self.max_len = max_len
+    
+    def _compute_pe(self, seq_len: int) -> jax.Array:
+        """Compute positional encoding on-the-fly."""
+        position = jnp.arange(seq_len, dtype=jnp.float32).reshape(-1, 1)
+        div_term = jnp.arange(0, self.num_hiddens, 2, dtype=jnp.float32) / self.num_hiddens
         div_term = 1.0 / jnp.power(10000.0, div_term)
         
-        # Create encoding matrix [1, max_len, num_hiddens]
-        pe = jnp.zeros((1, max_len, num_hiddens))
+        # Create encoding matrix [1, seq_len, num_hiddens]
+        pe = jnp.zeros((1, seq_len, self.num_hiddens))
         pe = pe.at[:, :, 0::2].set(jnp.sin(position * div_term))
         pe = pe.at[:, :, 1::2].set(jnp.cos(position * div_term))
-        
-        self.pe = pe
+        return pe
     
     def __call__(self, x: jax.Array, *, train: bool = True) -> jax.Array:
         """
@@ -36,7 +38,8 @@ class PositionalEncoding(nnx.Module):
             Output tensor of shape [B, S, D]
         """
         seq_len = x.shape[1]
-        x = x + self.pe[:, :seq_len, :]
+        pe = self._compute_pe(seq_len)
+        x = x + pe
         return self.dropout(x, deterministic=not train)
 
 
