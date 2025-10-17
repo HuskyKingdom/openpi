@@ -836,8 +836,6 @@ _CONFIGS = [
         freeze_filter=pi0_config.Pi0Config(
             train_only_energy_model=True,
         ).get_freeze_filter(),
-
-
     ), 
     TrainConfig(
         name="pi05_aloha_pen_uncap",

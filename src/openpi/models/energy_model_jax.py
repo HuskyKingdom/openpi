@@ -138,10 +138,10 @@ class EnergyModel(nnx.Module):
         self,
         state_dim: int,
         act_dim: int,
+        rngs: nnx.Rngs,
         hidden: int = 512,
         num_heads: int = 8,
         num_layers: int = 4,
-        rngs: nnx.Rngs,
     ):
         super().__init__()
         

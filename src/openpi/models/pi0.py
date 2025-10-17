@@ -105,10 +105,10 @@ class Pi0(_model.BaseModel):
         self.energy_model = EnergyModel(
             state_dim=action_expert_config.width,
             act_dim=config.action_dim,
+            rngs=rngs,
             hidden=config.energy_hidden,
             num_heads=config.energy_heads,
             num_layers=config.energy_layers,
-            rngs=rngs,
         )
         self.use_energy_loss = config.use_energy_loss
 

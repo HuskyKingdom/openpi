@@ -26,10 +26,10 @@ def test_energy_model():
     model = EnergyModel(
         state_dim=state_dim,
         act_dim=act_dim,
+        rngs=rngs,
         hidden=hidden,
         num_heads=4,
         num_layers=2,
-        rngs=rngs,
     )
     
     # Create dummy inputs
