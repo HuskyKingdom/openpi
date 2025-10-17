@@ -307,12 +307,14 @@ def energy_inbatch_swap_infonce(
     
     # Compute statistics
     E_pos_mean = jnp.mean(jnp.diag(E_ij))
-    if B > 1:
-        # Get off-diagonal elements
-        mask = ~jnp.eye(B, dtype=bool)
-        E_neg_mean = jnp.mean(E_ij[mask])
-    else:
-        E_neg_mean = jnp.array(0.0)
+    
+    # Compute mean of off-diagonal elements (negative pairs)
+    # Use jnp.where instead of boolean indexing for JIT compatibility
+    mask = ~jnp.eye(B, dtype=bool)
+    E_neg_sum = jnp.sum(jnp.where(mask, E_ij, 0.0))
+    E_neg_count = jnp.sum(mask)
+    # Avoid division by zero (though E_neg_count should always be B*(B-1) for B>1)
+    E_neg_mean = E_neg_sum / jnp.maximum(E_neg_count, 1.0)
     
     return loss, E_pos_mean, E_neg_mean
 
