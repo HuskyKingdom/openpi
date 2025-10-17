@@ -104,14 +104,16 @@ class Pi0(_model.BaseModel):
         # Initialize energy model (JAX version)
         # Note: state_dim should match the output dimension of PaliGemma (prefix_out),
         # not the action expert dimension
+        energy_act_dim = config.energy_act_dim if config.energy_act_dim is not None else config.action_dim
         self.energy_model = EnergyModel(
             state_dim=paligemma_config.width,  # Use paligemma width, not action expert width
-            act_dim=config.action_dim,
+            act_dim=energy_act_dim,
             rngs=rngs,
             hidden=config.energy_hidden,
             num_heads=config.energy_heads,
             num_layers=config.energy_layers,
         )
+        self.energy_act_dim = energy_act_dim
         self.use_energy_loss = config.use_energy_loss
 
         # This attribute gets automatically set by model.train() and model.eval().
@@ -235,9 +237,9 @@ class Pi0(_model.BaseModel):
         # But prefix_mask has True for valid tokens, so we need to invert it
         inverted_prefix_mask = ~prefix_mask  # Now True = padding, False = valid
         
-        # For LIBERO, only use first 7 action dimensions (rest is padding)
-        # For other tasks, you may want to make this configurable
-        u_t_action = u_t[:, :, :7]
+        # Extract the actual action dimensions used by energy model
+        # (which may be less than the padded action_dim)
+        u_t_action = u_t[:, :, :self.energy_act_dim]
         
         # Compute InfoNCE contrastive loss
         energy_loss, E_pos_mean, E_neg_mean = energy_inbatch_swap_infonce(

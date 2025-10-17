@@ -698,6 +698,7 @@ _CONFIGS = [
             energy_hidden=512,
             energy_heads=8,
             energy_layers=4,
+            energy_act_dim=7,  # LIBERO uses 7-dim actions (6 joints + 1 gripper)
         ),
         data=LeRobotLiberoDataConfig(
             repo_id="physical-intelligence/libero",
@@ -820,6 +821,7 @@ _CONFIGS = [
             repo_id="physical-intelligence/libero",
             base_config=DataConfig(prompt_from_task=True),
             extra_delta_transform=False,
+            energy_act_dim=7,
         ),
         batch_size=25,
         lr_schedule=_optimizer.CosineDecaySchedule(
