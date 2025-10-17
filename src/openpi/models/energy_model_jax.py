@@ -99,11 +99,13 @@ class MLPResNet(nnx.Module):
         rngs: nnx.Rngs
     ):
         super().__init__()
+        self.num_blocks = num_blocks
         self.layer_norm1 = nnx.LayerNorm(input_dim, rngs=rngs)
         self.fc1 = nnx.Linear(input_dim, hidden_dim, rngs=rngs)
         
-        # Use nnx.Sequential to avoid list indexing issues in parameter serialization
-        self.blocks = nnx.Sequential(*[MLPResNetBlock(hidden_dim, rngs=rngs) for _ in range(num_blocks)])
+        # Store blocks with string keys to avoid integer indexing in parameter paths
+        for i in range(num_blocks):
+            setattr(self, f"block_{i}", MLPResNetBlock(hidden_dim, rngs=rngs))
         
         self.layer_norm2 = nnx.LayerNorm(hidden_dim, rngs=rngs)
         self.fc2 = nnx.Linear(hidden_dim, output_dim, rngs=rngs)
@@ -119,7 +121,10 @@ class MLPResNet(nnx.Module):
         x = self.fc1(x)
         x = nnx.silu(x)
         
-        x = self.blocks(x)  # Sequential can be called directly
+        # Apply blocks sequentially
+        for i in range(self.num_blocks):
+            block = getattr(self, f"block_{i}")
+            x = block(x)
         
         x = self.layer_norm2(x)
         x = self.fc2(x)
