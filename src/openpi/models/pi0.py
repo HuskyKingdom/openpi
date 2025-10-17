@@ -14,6 +14,7 @@ import openpi.models.siglip as _siglip
 from openpi.shared import array_typing as at
 import torch
 from openpi.models.energy_model import EnergyModel
+import numpy as np
 
 logger = logging.getLogger("openpi")
 
