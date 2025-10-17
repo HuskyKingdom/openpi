@@ -136,7 +136,7 @@ class Pi0(_model.BaseModel):
         # This attribute gets automatically set by model.train() and model.eval().
         self.deterministic = True
 
-        energy_model = EnergyModel(512,7).to(device_id)
+        energy_model = EnergyModel(512,7).to("cuda")
 
     @at.typecheck
     def embed_prefix(
