@@ -295,7 +295,7 @@ def energy_inbatch_swap_infonce(
     
     # Compute energy for all pairs
     E_all = energy_model(h_rep, a_rep, pm, train=train)  # [B*B, 1]
-    E_ij = E_all.reshape(B, B).squeeze(-1)  # [B, B]
+    E_ij = E_all.squeeze(-1).reshape(B, B)  # [B, B] - squeeze first, then reshape
     
     # InfoNCE loss: lower energy = higher similarity
     logits = (-E_ij) / tau  # [B, B]
