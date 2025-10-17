@@ -807,7 +807,7 @@ _CONFIGS = [
         pytorch_weight_path="/path/to/your/pytorch_weight_path",
         num_train_steps=30_000,
         freeze_filter=nnx.Param,
-    ),
+    ), 
     TrainConfig(
         name="pi05_aloha_pen_uncap",
         model=pi0_config.Pi0Config(pi05=True),
