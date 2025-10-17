@@ -688,6 +688,33 @@ _CONFIGS = [
         ema_decay=None,
     ),
     TrainConfig(
+        name="pi0_libero_energy_only",
+        # Train ONLY the energy model, freeze all other parameters.
+        # This is useful when you want to learn an energy-based model for the policy
+        # without modifying the pre-trained policy weights.
+        model=pi0_config.Pi0Config(
+            use_energy_loss=True,  # Enable energy loss in training
+            train_only_energy_model=True,  # Freeze everything except energy_model
+            energy_hidden=512,
+            energy_heads=8,
+            energy_layers=4,
+        ),
+        data=LeRobotLiberoDataConfig(
+            repo_id="physical-intelligence/libero",
+            base_config=DataConfig(prompt_from_task=True),
+            extra_delta_transform=True,
+        ),
+        # Load the pre-trained Pi0 base model
+        weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi0_base/params"),
+        num_train_steps=30_000,
+        # The freeze filter is automatically set by train_only_energy_model flag
+        freeze_filter=pi0_config.Pi0Config(
+            train_only_energy_model=True,
+        ).get_freeze_filter(),
+        # Turn off EMA for energy model training
+        ema_decay=None,
+    ),
+    TrainConfig(
         name="pi0_fast_libero",
         # Here is an example of loading a pi0-FAST model for full finetuning.
         # Modify action_dim and action_horizon to match your dataset (action horizon is equal to

@@ -12,42 +12,9 @@ from openpi.models import pi0_config
 import openpi.models.gemma as _gemma
 import openpi.models.siglip as _siglip
 from openpi.shared import array_typing as at
-import torch
-from openpi.models.energy_model import EnergyModel
-import numpy as np
+from openpi.models.energy_model_jax import EnergyModel, energy_inbatch_swap_infonce
 
 logger = logging.getLogger("openpi")
-
-@torch.no_grad()
-def _offdiag_mask(B, device): return ~torch.eye(B, dtype=torch.bool, device=device)
-
-def energy_inbatch_swap_infonce(
-    energy_model,
-    h: torch.Tensor,          # [B,S,D]
-    a_pos: torch.Tensor,      # [B,H,Da]
-    pad_mask: torch.Tensor,   # [B,S+H]，True=pad
-    tau: float = 0.5,
-    reduce_steps: str = "mean",
-):
-    B, S, D = h.shape
-    H, Da   = a_pos.shape[1], a_pos.shape[2]
-    dtype   = next(energy_model.parameters()).dtype
-
-    h_rep = h.to(dtype).unsqueeze(1).expand(B, B, S, D).reshape(B*B, S, D)        # [B*B,S,D]
-    a_rep = a_pos.to(dtype).unsqueeze(0).expand(B, B, H, Da).reshape(B*B, H, Da)  # [B*B,H,Da]
-    pm = None
-    if pad_mask is not None:
-        pm  = pad_mask.unsqueeze(1).expand(B, B, pad_mask.size(1)).reshape(B*B, pad_mask.size(1))  # [B*B,S+H]
-
-    E_ij = energy_model(h_rep, a_rep, pm).view(B, B, 1).squeeze(-1)               # [B,B]
-
-    logits = (-E_ij) / tau
-    labels = torch.arange(B, device=h.device)
-    loss   = F.cross_entropy(logits, labels)
-
-    E_pos_mean = torch.diag(E_ij).mean()
-    E_neg_mean = E_ij[_offdiag_mask(B, h.device)].mean() if B > 1 else torch.tensor(0., device=h.device, dtype=E_ij.dtype)
-    return loss, E_pos_mean, E_neg_mean
 
 
 
@@ -133,11 +100,20 @@ class Pi0(_model.BaseModel):
             self.action_time_mlp_in = nnx.Linear(2 * action_expert_config.width, action_expert_config.width, rngs=rngs)
             self.action_time_mlp_out = nnx.Linear(action_expert_config.width, action_expert_config.width, rngs=rngs)
         self.action_out_proj = nnx.Linear(action_expert_config.width, config.action_dim, rngs=rngs)
+        
+        # Initialize energy model (JAX version)
+        self.energy_model = EnergyModel(
+            state_dim=action_expert_config.width,
+            act_dim=config.action_dim,
+            hidden=config.energy_hidden,
+            num_heads=config.energy_heads,
+            num_layers=config.energy_layers,
+            rngs=rngs,
+        )
+        self.use_energy_loss = config.use_energy_loss
 
         # This attribute gets automatically set by model.train() and model.eval().
         self.deterministic = True
-
-        energy_model = EnergyModel(512,7).to("cuda")
 
     @at.typecheck
     def embed_prefix(
@@ -248,31 +224,41 @@ class Pi0(_model.BaseModel):
         )
         
         v_t = self.action_out_proj(suffix_out[:, -self.action_horizon :])
-
         
-       
-
-        # calculate energy loss
-        inverted_prefix_mask = ~prefix_mask
-
-        mask_np = np.asarray(inverted_prefix_mask)
-        mask_torch = torch.from_numpy(mask_np).to("cuda")
-
-        np_arr = np.asarray(prefix_out.astype(jnp.float32))
-        np_arr = np.asarray(prefix_out)
-        prefix_out_torch = torch.from_numpy(np_arr).to("cuda")
-
-        expert_action = u_t[:,:,:7].to("cuda")
-
-
-
-        swap_loss, E_pos_mean, E_neg_mean = energy_inbatch_swap_infonce(self.energy_model, prefix_out_torch, expert_action, inverted_prefix_mask)
-        energy_loss = swap_loss
-
-        print(energy_loss)
-        assert 1==2
+        # Calculate flow matching loss
+        flow_loss = jnp.mean(jnp.square(v_t - u_t), axis=-1)
         
-        return jnp.mean(jnp.square(v_t - u_t), axis=-1), energy_loss
+        # Calculate energy loss using JAX energy model
+        # Note: In JAX attention, True in mask means "do not attend" (padding)
+        # But prefix_mask has True for valid tokens, so we need to invert it
+        inverted_prefix_mask = ~prefix_mask  # Now True = padding, False = valid
+        
+        # For LIBERO, only use first 7 action dimensions (rest is padding)
+        # For other tasks, you may want to make this configurable
+        u_t_action = u_t[:, :, :7]
+        
+        # Compute InfoNCE contrastive loss
+        energy_loss, E_pos_mean, E_neg_mean = energy_inbatch_swap_infonce(
+            self.energy_model,
+            prefix_out,
+            u_t_action,
+            pad_mask=inverted_prefix_mask,
+            tau=0.5,
+            train=train,
+        )
+        
+        # Log energy statistics for monitoring
+        jax.debug.print("Energy loss: {e:.4f}, E_pos: {p:.4f}, E_neg: {n:.4f}", 
+                       e=energy_loss, p=E_pos_mean, n=E_neg_mean)
+        
+        # Combine losses based on configuration
+        if self.use_energy_loss:
+            # Include energy loss with a weight (you can tune this weight)
+            total_loss = flow_loss + 0.1 * energy_loss
+            return total_loss
+        else:
+            # Only use flow matching loss (energy loss computed for monitoring only)
+            return flow_loss
 
     @override
     def sample_actions(

@@ -31,6 +31,13 @@ class Pi0Config(_model.BaseModelConfig):
     pi05: bool = False
     # This config option is not used directly by the model, but it is read by the ModelTransformFactory.
     discrete_state_input: bool = None  # type: ignore
+    
+    # Energy model configuration
+    energy_hidden: int = 512
+    energy_heads: int = 8
+    energy_layers: int = 4
+    use_energy_loss: bool = False  # Set to True to include energy loss in training
+    train_only_energy_model: bool = False  # Set to True to freeze all params except energy_model
 
     def __post_init__(self):
         if self.max_token_len is None:
@@ -78,6 +85,15 @@ class Pi0Config(_model.BaseModelConfig):
 
     def get_freeze_filter(self) -> nnx.filterlib.Filter:
         """Returns the freeze filter based on the model config."""
+        # If train_only_energy_model is True, freeze everything except energy_model
+        if self.train_only_energy_model:
+            # Freeze all parameters that are NOT in energy_model
+            # This matches all params EXCEPT those with "energy_model" in their path
+            return nnx.All(
+                nnx.Param,
+                nnx.Not(nnx_utils.PathRegex(".*energy_model.*")),
+            )
+        
         filters = []
         has_lora = False
         gemma_params_filter = nnx_utils.PathRegex(".*llm.*")
