@@ -833,7 +833,11 @@ _CONFIGS = [
         weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi05_libero/params"),
         pytorch_weight_path="/path/to/your/pytorch_weight_path",
         num_train_steps=30_000,
-        freeze_filter=nnx.Param,
+        freeze_filter=pi0_config.Pi0Config(
+            train_only_energy_model=True,
+        ).get_freeze_filter(),
+
+
     ), 
     TrainConfig(
         name="pi05_aloha_pen_uncap",
