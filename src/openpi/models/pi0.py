@@ -102,8 +102,10 @@ class Pi0(_model.BaseModel):
         self.action_out_proj = nnx.Linear(action_expert_config.width, config.action_dim, rngs=rngs)
         
         # Initialize energy model (JAX version)
+        # Note: state_dim should match the output dimension of PaliGemma (prefix_out),
+        # not the action expert dimension
         self.energy_model = EnergyModel(
-            state_dim=action_expert_config.width,
+            state_dim=paligemma_config.width,  # Use paligemma width, not action expert width
             act_dim=config.action_dim,
             rngs=rngs,
             hidden=config.energy_hidden,
