@@ -135,6 +135,8 @@ class Pi0(_model.BaseModel):
         # This attribute gets automatically set by model.train() and model.eval().
         self.deterministic = True
 
+        energy_model = EnergyModel(512,7).to(device_id)
+
     @at.typecheck
     def embed_prefix(
         self, obs: _model.Observation
@@ -245,10 +247,12 @@ class Pi0(_model.BaseModel):
         
         v_t = self.action_out_proj(suffix_out[:, -self.action_horizon :])
 
+        print(u_t)
+        assert 1==2
 
         # calculate energy loss
         inverted_prefix_mask = ~prefix_mask
-        swap_loss, E_pos_mean, E_neg_mean = energy_inbatch_swap_infonce(self.energy_model, prefix_out, u_t, inverted_prefix_mask)
+        swap_loss, E_pos_mean, E_neg_mean = energy_inbatch_swap_infonce(energy_model, prefix_out, u_t, inverted_prefix_mask)
         energy_loss = swap_loss
 
         print(energy_loss)
