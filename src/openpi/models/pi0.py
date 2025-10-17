@@ -255,8 +255,8 @@ class Pi0(_model.BaseModel):
         # calculate energy loss
         inverted_prefix_mask = ~prefix_mask
 
-        capsule = jax.dlpack.to_dlpack(inverted_prefix_mask)
-        mask_torch = torch.utils.dlpack.from_dlpack(capsule)
+        mask_np = np.asarray(inverted_prefix_mask)
+        mask_torch = torch.from_numpy(mask_np).to("cuda")
 
         np_arr = np.asarray(prefix_out.astype(jnp.float32))
         np_arr = np.asarray(prefix_out)
