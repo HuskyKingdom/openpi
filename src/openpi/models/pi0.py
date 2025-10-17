@@ -248,12 +248,23 @@ class Pi0(_model.BaseModel):
         
         v_t = self.action_out_proj(suffix_out[:, -self.action_horizon :])
 
-        print(u_t)
-        assert 1==2
+        
+       
 
         # calculate energy loss
         inverted_prefix_mask = ~prefix_mask
-        swap_loss, E_pos_mean, E_neg_mean = energy_inbatch_swap_infonce(energy_model, prefix_out, u_t, inverted_prefix_mask)
+        mask_np = np.asarray(inverted_prefix_mask)
+        mask_torch = torch.from_numpy(mask_np).to("cuda") 
+
+        np_arr = np.asarray(prefix_out.astype(jnp.float32))
+        np_arr = np.asarray(prefix_out)
+        prefix_out_torch = torch.from_numpy(np_arr).to("cuda")
+
+        expert_action = u_t[:,:,:7].to("cuda")
+
+
+
+        swap_loss, E_pos_mean, E_neg_mean = energy_inbatch_swap_infonce(self.energy_model, prefix_out_torch, expert_action, inverted_prefix_mask)
         energy_loss = swap_loss
 
         print(energy_loss)
