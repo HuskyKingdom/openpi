@@ -228,10 +228,10 @@ class EnergyModel(nnx.Module):
         # Note: Runtime checks on traced arrays are not possible in JIT.
         # Ensure pad_mask doesn't have all-True rows when calling this function.
         if pad_mask is not None:
-            # Convert mask for cross attention [B, H, S]
-            # Expand to match attention shape
-            attn_mask = pad_mask[:, None, :]  # [B, 1, S]
-            attn_mask = jnp.broadcast_to(attn_mask, (pad_mask.shape[0], action_mapped.shape[1], pad_mask.shape[1]))
+            # MultiHeadAttention expects mask shape: [B, num_heads, query_len, key_len]
+            # or a broadcastable shape like [B, 1, 1, key_len]
+            # pad_mask is [B, S], expand to [B, 1, 1, S]
+            attn_mask = pad_mask[:, None, None, :]  # [B, 1, 1, S]
         else:
             attn_mask = None
         
