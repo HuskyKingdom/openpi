@@ -258,7 +258,7 @@ class Pi0(_model.BaseModel):
         # Combine losses based on configuration
         if self.use_energy_loss:
             # Include energy loss with a weight (you can tune this weight)
-            total_loss = flow_loss + 0.1 * energy_loss
+            total_loss = energy_loss
             return total_loss
         else:
             # Only use flow matching loss (energy loss computed for monitoring only)

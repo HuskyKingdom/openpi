@@ -37,7 +37,7 @@ class Pi0Config(_model.BaseModelConfig):
     energy_heads: int = 8
     energy_layers: int = 4
     energy_act_dim: int | None = None  # Action dimension for energy model (defaults to action_dim if None)
-    use_energy_loss: bool = False  # Set to True to include energy loss in training
+    use_energy_loss: bool = True  # Set to True to include energy loss in training
     train_only_energy_model: bool = False  # Set to True to freeze all params except energy_model
 
     def __post_init__(self):

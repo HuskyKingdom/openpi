@@ -835,7 +835,7 @@ _CONFIGS = [
         pytorch_weight_path="/path/to/your/pytorch_weight_path",
         num_train_steps=30_000,
         freeze_filter=pi0_config.Pi0Config(
-            train_only_energy_model=True,
+            train_only_energy_model=True, 
         ).get_freeze_filter(),
     ), 
     TrainConfig(
