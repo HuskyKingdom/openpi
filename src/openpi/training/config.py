@@ -832,9 +832,9 @@ _CONFIGS = [
         batch_size=25,
         lr_schedule=_optimizer.CosineDecaySchedule(
             warmup_steps=10_000,
-            peak_lr=5e-5,
+            peak_lr=5.0,
             decay_steps=1_000_000,
-            decay_lr=5e-5,
+            decay_lr=5.0,
         ),
         optimizer=_optimizer.AdamW(clip_gradient_norm=1.0),
         ema_decay=None,  # Turn off EMA when training only energy model (RNG keys can't be averaged)
