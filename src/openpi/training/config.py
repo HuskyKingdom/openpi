@@ -816,7 +816,14 @@ _CONFIGS = [
     ),
     TrainConfig(
         name="pi05_libero_energy",
-        model=pi0_config.Pi0Config(pi05=True, action_horizon=10, discrete_state_input=False, energy_act_dim=7,),
+        model=pi0_config.Pi0Config(
+            pi05=True, 
+            action_horizon=10, 
+            discrete_state_input=False, 
+            energy_act_dim=7,
+            use_energy_loss=True,  # Enable energy loss in training
+            train_only_energy_model=True,  # Freeze all other parameters
+        ),
         data=LeRobotLiberoDataConfig(
             repo_id="physical-intelligence/libero",
             base_config=DataConfig(prompt_from_task=True),

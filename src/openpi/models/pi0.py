@@ -238,14 +238,14 @@ class Pi0(_model.BaseModel):
         inverted_prefix_mask = ~prefix_mask  # Now True = padding, False = valid
         
         # Extract the actual action dimensions used by energy model
-        # (which may be less than the padded action_dim)
-        u_t_action = u_t[:, :, :self.energy_act_dim]
+        # Use ground-truth actions (not velocity field u_t) for contrastive learning
+        actions_for_energy = actions[:, :, :self.energy_act_dim]
         
         # Compute InfoNCE contrastive loss
         energy_loss, E_pos_mean, E_neg_mean = energy_inbatch_swap_infonce(
             self.energy_model,
             prefix_out,
-            u_t_action,
+            actions_for_energy,  # Use ground-truth actions, not velocity field
             pad_mask=inverted_prefix_mask,
             tau=0.5,
             train=train,
@@ -257,9 +257,9 @@ class Pi0(_model.BaseModel):
         
         # Combine losses based on configuration
         if self.use_energy_loss:
-            # Include energy loss with a weight (you can tune this weight)
-            total_loss = energy_loss
-            return total_loss
+            # When training only energy model, optimize energy loss
+            # Flow loss is still computed for monitoring
+            return energy_loss
         else:
             # Only use flow matching loss (energy loss computed for monitoring only)
             return flow_loss
