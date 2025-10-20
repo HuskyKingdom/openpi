@@ -186,6 +186,15 @@ def eval_libero(args: Args) -> None:
     logging.info(f"Total episodes: {total_episodes}")
 
 
+    final_success_rate = float(total_successes) / float(total_episodes)
+    energy = "wo_energy"
+    if policy.config == "pi05_libero_energy":
+        energy = "w_energy"
+    with open(f"/home/aup/YuhangWorkspace/yhs-pi/experiment_results/openpi_{args.task_suite_name}_{energy}.txt", "w", encoding="utf-8") as f:
+        f.write(f"{final_success_rate:.4f}")  
+
+
+
 def _get_libero_env(task, resolution, seed):
     """Initializes and returns the LIBERO environment, along with the task description."""
     task_description = task.language
@@ -216,4 +225,6 @@ def _quat2axisangle(quat):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
+    print(policy.config)
+    assert 1==2
     tyro.cli(eval_libero)
