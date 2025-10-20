@@ -451,7 +451,6 @@ class Pi0(_model.BaseModel):
             # Replace the corrected dimensions, keep the rest (padding) unchanged
             corrected_actions = actions.at[:, :, :self.energy_act_dim].set(corrected_actions_partial)
 
-            assert 1==2
             return corrected_actions
 
 
