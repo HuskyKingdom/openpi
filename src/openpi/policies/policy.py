@@ -58,7 +58,7 @@ class Policy(BasePolicy):
         if self._is_pytorch_model:
             self._model = self._model.to(pytorch_device)
             self._model.eval()
-            self._sample_actions = model.sample_actions_with_energy_correction
+            self._sample_actions = model.sample_actions
         else:
             # JAX model setup
             self._sample_actions = nnx_utils.module_jit(model.sample_actions)

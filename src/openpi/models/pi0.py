@@ -338,7 +338,8 @@ class Pi0(_model.BaseModel):
             return x_0
             assert 1==2
         else:
-             from openpi.models.energy_correction import multi_step_energy_correction
+            
+            from openpi.models.energy_correction import multi_step_energy_correction
             # First, sample actions using standard flow matching
             actions = self.sample_actions(
                 rng, observation, num_steps=num_steps, noise=noise
