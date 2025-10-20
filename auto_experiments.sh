@@ -1,7 +1,6 @@
 #!/bin/bash
 
 
-xhost +local:docker
 
 # without energy
 echo "Running Evaluations Automatically ------------------------------"
