@@ -43,6 +43,7 @@ class Args:
     video_out_path: str = "data/libero/videos"  # Path to save videos
 
     seed: int = 7  # Random Seed (for reproducibility)
+    energy: bool = False
 
 
 def eval_libero(args: Args) -> None:
@@ -191,7 +192,7 @@ def eval_libero(args: Args) -> None:
 
     final_success_rate = float(total_successes) / float(total_episodes)
     energy = "wo_energy"
-    if args.policy.config == "pi05_libero_energy":
+    if args.energy:
         energy = "w_energy"
     with open(f"/home/aup/YuhangWorkspace/yhs-pi/experiment_results/openpi_{args.task_suite_name}_{energy}.txt", "w", encoding="utf-8") as f:
         f.write(f"{final_success_rate:.4f}")  
