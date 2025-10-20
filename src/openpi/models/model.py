@@ -232,12 +232,38 @@ class BaseModelConfig(abc.ABC):
 
     def load(self, params: at.Params, *, remove_extra_params: bool = True) -> "BaseModel":
         """Create a model with the given parameters."""
+        import flax.traverse_util as traverse_util
+        
         model = nnx.eval_shape(self.create, jax.random.key(0))
         graphdef, state = nnx.split(model)
+        
+        # Filter out RNG states from the expected state for comparison
+        # RNG states will be re-initialized and should not be loaded from checkpoint
+        expected_dict = state.to_pure_dict()
+        expected_flat = traverse_util.flatten_dict(expected_dict, sep="/")
+        expected_filtered = {
+            k: v for k, v in expected_flat.items()
+            if not any(key_part in ['rngs', 'RngState', 'RngKey', 'RngCount'] for key_part in k.split('/'))
+        }
+        expected_dict = traverse_util.unflatten_dict(expected_filtered, sep="/")
+        
         if remove_extra_params:
-            params = ocp.transform_utils.intersect_trees(state.to_pure_dict(), params)
-        at.check_pytree_equality(expected=state.to_pure_dict(), got=params, check_shapes=True, check_dtypes=False)
-        state.replace_by_pure_dict(params)
+            params = ocp.transform_utils.intersect_trees(expected_dict, params)
+        at.check_pytree_equality(expected=expected_dict, got=params, check_shapes=True, check_dtypes=False)
+        
+        # Merge params into state, keeping the randomly initialized RNG states
+        state_dict = state.to_pure_dict()
+        state_flat = traverse_util.flatten_dict(state_dict, sep="/")
+        params_flat = traverse_util.flatten_dict(params, sep="/")
+        
+        # Update non-RNG parameters from checkpoint
+        for k, v in params_flat.items():
+            if k in state_flat:
+                state_flat[k] = v
+        
+        merged_state_dict = traverse_util.unflatten_dict(state_flat, sep="/")
+        state.replace_by_pure_dict(merged_state_dict)
+        
         return nnx.merge(graphdef, state)
 
     def load_pytorch(self, train_config, weight_path: str):

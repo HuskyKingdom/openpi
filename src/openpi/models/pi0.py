@@ -328,3 +328,79 @@ class Pi0(_model.BaseModel):
 
         x_0, _ = jax.lax.while_loop(cond, step, (noise, 1.0))
         return x_0
+    
+    def sample_actions_with_energy_correction(
+        self,
+        rng: at.KeyArrayLike,
+        observation: _model.Observation,
+        *,
+        num_steps: int | at.Int[at.Array, ""] = 10,
+        noise: at.Float[at.Array, "b ah ad"] | None = None,
+        energy_correction_steps: int = 3,
+        energy_alpha: float = 0.1,
+        energy_clip_frac: float = 0.2,
+        correct_first_only: bool = False,
+    ) -> _model.Actions:
+        """
+        Sample actions with energy-based correction.
+        
+        This method first generates actions using flow matching, then refines them
+        using gradient descent on the energy landscape.
+        
+        Args:
+            rng: Random key
+            observation: Input observation
+            num_steps: Number of flow matching steps
+            noise: Optional initial noise
+            energy_correction_steps: Number of energy gradient descent steps (0 to disable)
+            energy_alpha: Step size for energy correction
+            energy_clip_frac: Maximum correction as fraction of action norm
+            correct_first_only: Only correct the first action in the chunk
+            
+        Returns:
+            corrected_actions: Energy-corrected actions
+        """
+        from openpi.models.energy_correction import multi_step_energy_correction
+        
+        # First, sample actions using standard flow matching
+        actions = self.sample_actions(
+            rng, observation, num_steps=num_steps, noise=noise
+        )
+        
+        # If energy correction is disabled, return base actions
+        if energy_correction_steps == 0:
+            return actions
+        
+        # Get context representation for energy model
+        observation = _model.preprocess_observation(None, observation, train=False)
+        prefix_tokens, prefix_mask, prefix_ar_mask = self.embed_prefix(observation)
+        prefix_attn_mask = make_attn_mask(prefix_mask, prefix_ar_mask)
+        positions = jnp.cumsum(prefix_mask, axis=1) - 1
+        (prefix_out,), _ = self.PaliGemma.llm(
+            [prefix_tokens, None], 
+            mask=prefix_attn_mask, 
+            positions=positions,
+            adarms_cond=[None, None],
+        )
+        
+        # Prepare inputs for energy correction
+        inverted_prefix_mask = ~prefix_mask  # Energy model expects True=padding
+        actions_for_correction = actions[:, :, :self.energy_act_dim]
+        
+        # Apply energy correction
+        corrected_actions_partial = multi_step_energy_correction(
+            self.energy_model,
+            prefix_out,
+            actions_for_correction,
+            pad_mask=inverted_prefix_mask,
+            num_steps=energy_correction_steps,
+            alpha=energy_alpha,
+            clip_frac=energy_clip_frac,
+            correct_first_only=correct_first_only,
+            train=False,
+        )
+        
+        # Replace the corrected dimensions, keep the rest (padding) unchanged
+        corrected_actions = actions.at[:, :, :self.energy_act_dim].set(corrected_actions_partial)
+        
+        return corrected_actions

@@ -143,13 +143,30 @@ class CallbackRestore(ocp.args.CheckpointArgs): ...
 
 
 def _split_params(state: training_utils.TrainState) -> tuple[training_utils.TrainState, at.Params]:
+    import flax.nnx as nnx
+    import flax.traverse_util as traverse_util
+    
     if state.ema_params is not None:
         params = state.ema_params
         train_state = dataclasses.replace(state, ema_params=None)
     else:
         params = state.params
         train_state = dataclasses.replace(state, params={})
-    return train_state, params
+    
+    # Filter out RNG states from params to avoid shape mismatch on load
+    # RNG states should not be checkpointed as they will be re-initialized on load
+    params_dict = params.to_pure_dict()
+    flat_params = traverse_util.flatten_dict(params_dict, sep="/")
+    
+    # Remove all RNG-related keys
+    filtered_params = {
+        k: v for k, v in flat_params.items() 
+        if not any(key_part in ['rngs', 'RngState', 'RngKey', 'RngCount'] for key_part in k.split('/'))
+    }
+    
+    params_filtered = traverse_util.unflatten_dict(filtered_params, sep="/")
+    
+    return train_state, params_filtered
 
 
 def _merge_params(train_state: training_utils.TrainState, params: dict[str, at.Params]) -> training_utils.TrainState:
