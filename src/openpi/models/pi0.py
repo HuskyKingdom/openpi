@@ -106,6 +106,7 @@ class Pi0(_model.BaseModel):
         # not the action expert dimension
         energy_act_dim = config.energy_act_dim if config.energy_act_dim is not None else config.action_dim
 
+        self.energy_model = None
         if config.energy_act_dim is not None:
             self.energy_model = EnergyModel(
                 state_dim=paligemma_config.width,  # Use paligemma width, not action expert width
@@ -280,7 +281,7 @@ class Pi0(_model.BaseModel):
         correct_first_only: bool = False,
     ) -> _model.Actions:
 
-        if self.energy_model is not None:
+        if self.energy_model is None:
             observation = _model.preprocess_observation(None, observation, train=False)
             # note that we use the convention more common in diffusion literature, where t=1 is noise and t=0 is the target
             # distribution. yes, this is the opposite of the pi0 paper, and I'm sorry.
@@ -335,10 +336,11 @@ class Pi0(_model.BaseModel):
                 return time >= -dt / 2
 
             x_0, _ = jax.lax.while_loop(cond, step, (noise, 1.0))
-            return x_0
             assert 1==2
-        else:
+            return x_0
             
+        else:
+
             from openpi.models.energy_correction import multi_step_energy_correction
             # First, sample actions using standard flow matching
             actions = self.sample_actions(
@@ -380,6 +382,7 @@ class Pi0(_model.BaseModel):
             
             # Replace the corrected dimensions, keep the rest (padding) unchanged
             corrected_actions = actions.at[:, :, :self.energy_act_dim].set(corrected_actions_partial)
+
             assert 1==2
             return corrected_actions
 
