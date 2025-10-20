@@ -49,7 +49,7 @@ def eval_libero(args: Args) -> None:
     # Set random seed
     np.random.seed(args.seed)
 
-    print(args.policy.config)
+    print(args.energy)
     assert 1==2
 
     # Initialize LIBERO task suite
@@ -191,7 +191,7 @@ def eval_libero(args: Args) -> None:
 
     final_success_rate = float(total_successes) / float(total_episodes)
     energy = "wo_energy"
-    if policy.config == "pi05_libero_energy":
+    if args.policy.config == "pi05_libero_energy":
         energy = "w_energy"
     with open(f"/home/aup/YuhangWorkspace/yhs-pi/experiment_results/openpi_{args.task_suite_name}_{energy}.txt", "w", encoding="utf-8") as f:
         f.write(f"{final_success_rate:.4f}")  
