@@ -193,7 +193,7 @@ def eval_libero(args: Args) -> None:
     energy = "wo_energy"
     if args.energy:
         energy = "w_energy"
-    with open(f"/home/aup/YuhangWorkspace/yhs-pi/experiment_results/openpi_{args.task_suite_name}_{energy}.txt", "w", encoding="utf-8") as f:
+    with open(f"/home/aup/YuhangWorkspace/yhs-pi/openpi/experiment_results/openpi_{args.task_suite_name}_{energy}.txt", "w", encoding="utf-8") as f:
         f.write(f"{final_success_rate:.4f}")  
 
 
@@ -227,5 +227,7 @@ def _quat2axisangle(quat):
 
 
 if __name__ == "__main__":
+    with open(f"/home/aup/YuhangWorkspace/yhs-pi/openpi/experiment_results/openpi_11.txt", "w", encoding="utf-8") as f:
+        f.write(f"11")  
     logging.basicConfig(level=logging.INFO)
     tyro.cli(eval_libero)
