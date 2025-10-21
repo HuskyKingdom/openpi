@@ -227,7 +227,7 @@ def _quat2axisangle(quat):
 
 
 if __name__ == "__main__":
-    with open(f"/home/aup/YuhangWorkspace/yhs-pi/openpi/experiment_results/openpi_11.txt", "w", encoding="utf-8") as f:
+    with open(f"/app/experiment_results/openpi_11.txt", "w", encoding="utf-8") as f:
         f.write(f"11")  
     logging.basicConfig(level=logging.INFO)
     tyro.cli(eval_libero)
