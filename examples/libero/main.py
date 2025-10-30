@@ -5,6 +5,7 @@ import math
 import pathlib
 
 import imageio
+import time
 from libero.libero import benchmark
 from libero.libero import get_libero_path
 from libero.libero.envs import OffScreenRenderEnv
@@ -13,10 +14,16 @@ from openpi_client import image_tools
 from openpi_client import websocket_client_policy as _websocket_client_policy
 import tqdm
 import tyro
+try:
+    import torch  # Optional, for CUDA sync timing accuracy if available
+except Exception:  # pragma: no cover
+    torch = None
 
 LIBERO_DUMMY_ACTION = [0.0] * 6 + [-1.0]
 LIBERO_ENV_RESOLUTION = 256  # resolution used to render training data
 
+
+_FLOPS_INFO_PRINTED = False
 
 @dataclasses.dataclass
 class Args:
@@ -128,6 +135,9 @@ def eval_libero(args: Args) -> None:
                     if not action_plan:
                         # Finished executing previous action chunk -- compute new chunk
                         # Prepare observations dict
+                        if torch is not None and torch.cuda.is_available():
+                            torch.cuda.synchronize()
+                        _action_start_time = time.perf_counter()
                         element = {
                             "observation/image": img,
                             "observation/wrist_image": wrist_img,
@@ -143,6 +153,19 @@ def eval_libero(args: Args) -> None:
 
                         # Query model to get action
                         action_chunk = client.infer(element)["actions"]
+                        if torch is not None and torch.cuda.is_available():
+                            torch.cuda.synchronize()
+                        _action_elapsed_ms = (time.perf_counter() - _action_start_time) * 1000.0
+                        print("=" * 80)
+                        print(f"[TIMING] get_action (request + remote inference): {_action_elapsed_ms:.2f} ms ({_action_elapsed_ms/1000.0:.4f} s)")
+                        print("=" * 80)
+
+                        # One-time FLOPs note: remote model FLOPs cannot be computed locally
+                        global _FLOPS_INFO_PRINTED
+                        if not _FLOPS_INFO_PRINTED:
+                            print("[FLOPS] Remote inference over websocket: model FLOPs cannot be computed locally.")
+                            print("[FLOPS] If you need FLOPs, run locally with access to the VLA model.")
+                            _FLOPS_INFO_PRINTED = True
                         assert (
                             len(action_chunk) >= args.replan_steps
                         ), f"We want to replan every {args.replan_steps} steps, but policy only predicts {len(action_chunk)} steps."
