@@ -5,6 +5,7 @@ import time
 from typing import Any, TypeAlias
 
 import flax
+from flax import nnx
 import flax.traverse_util
 import jax
 import jax.numpy as jnp
@@ -54,6 +55,7 @@ class Policy(BasePolicy):
         self._metadata = metadata or {}
         self._is_pytorch_model = is_pytorch
         self._pytorch_device = pytorch_device
+        self._flops_logged = False
 
         if self._is_pytorch_model:
             self._model = self._model.to(pytorch_device)
@@ -93,7 +95,81 @@ class Policy(BasePolicy):
             "state": inputs["state"],
             "actions": self._sample_actions(sample_rng_or_pytorch_device, observation, **sample_kwargs),
         }
+        if not self._is_pytorch_model:
+            # Ensure JAX computations are finished before timing
+            _ = jax.tree.map(lambda x: x.block_until_ready(), outputs)
         model_time = time.monotonic() - start_time
+
+        # One-time FLOPs estimation and model info logging (server side)
+        if not self._flops_logged:
+            try:
+                total_params = 0
+                if self._is_pytorch_model:
+                    total_params = int(sum(p.numel() for p in self._model.parameters()))
+                else:
+                    # For JAX/NNX models, count leaves in the state tree
+                    import numpy as _np
+                    graphdef, state = nnx.split(self._model)
+                    del graphdef
+                    pure = state.to_pure_dict()
+                    # Flatten dict values and sum sizes
+                    def _sum_leaf(acc, leaf):
+                        try:
+                            if hasattr(leaf, "shape"):
+                                return acc + int(_np.prod(leaf.shape))
+                        except Exception:
+                            return acc
+                        return acc
+                    for v in flax.traverse_util.flatten_dict(pure, sep="/").values():
+                        try:
+                            if hasattr(v, "shape"):
+                                total_params += int(_np.prod(v.shape))
+                        except Exception:
+                            pass
+
+                # Sequence length estimation
+                seq_len = None
+                if observation.tokenized_prompt is not None:
+                    try:
+                        seq_len = int(observation.tokenized_prompt.shape[-1])
+                    except Exception:
+                        seq_len = None
+                if seq_len is None:
+                    try:
+                        seq_len = int(self._model.max_token_len)
+                    except Exception:
+                        seq_len = 1
+
+                estimated_flops = float(2 * total_params * seq_len)
+                infer_seconds = max(model_time, 1e-9)
+                gflops = estimated_flops / infer_seconds / 1e9
+                tflops = gflops / 1000.0
+
+                print("=" * 80)
+                try:
+                    model_type_name = type(self._model).__name__
+                except Exception:
+                    model_type_name = "UnknownModel"
+                print("[MODEL INFO]")
+                print(f"  Model type: {model_type_name}")
+                try:
+                    any_image = next(iter(observation.images.values()))
+                    print(f"  Input shape: image={getattr(any_image, 'shape', None)} state={getattr(observation.state, 'shape', None)}")
+                except Exception:
+                    pass
+
+                print("\n[MODEL STATISTICS]")
+                print(f"  Total Parameters: {total_params:,}")
+                print("\n[FLOPS ESTIMATION] (Approximate)")
+                print(f"  Estimated FLOPs per inference: {estimated_flops:.3e}")
+                print("  Note: This is a rough estimate for transformer-like forward pass")
+                print(f"  Estimated GFLOPS: {gflops:.2f} GFLOP/s")
+                print(f"  Estimated TFLOPS: {tflops:.4f} TFLOP/s")
+                print("=" * 80)
+            except Exception as _e:
+                logging.debug(f"FLOPs estimation skipped due to error: {_e}")
+            finally:
+                self._flops_logged = True
         if self._is_pytorch_model:
             outputs = jax.tree.map(lambda x: np.asarray(x[0, ...].detach().cpu()), outputs)
         else:
